@@ -1,0 +1,14 @@
+# Databricks
+.databricks/
+.bundle/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

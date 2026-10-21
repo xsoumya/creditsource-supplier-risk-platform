@@ -1,0 +1,55 @@
+# Databricks Asset Bundle — supplier financial risk platform (reference)
+bundle:
+  name: creditsource-supplier-risk
+
+variables:
+  catalog:
+    default: creditsource
+  textract_landing:
+    default: s3://creditsource-landing/supplier-financials/textract/
+  template_landing:
+    default: s3://creditsource-landing/supplier-financials/templates/
+  warehouse_id:
+    description: SQL warehouse used to run the ratio engine
+
+resources:
+  pipelines:
+    supplier_financials_pipeline:
+      name: supplier-financials-${bundle.target}
+      catalog: ${var.catalog}
+      schema: silver
+      serverless: true
+      continuous: false
+      libraries:
+        - file:
+            path: ./pipelines/supplier_financials_pipeline.py
+      configuration:
+        creditsource.landing.textract: ${var.textract_landing}
+        creditsource.landing.templates: ${var.template_landing}
+        creditsource.ref.coa_mapping: ${var.catalog}.ref.coa_mapping
+
+  jobs:
+    ratio_engine_job:
+      name: ratio-engine-${bundle.target}
+      tasks:
+        - task_key: refresh_silver
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.supplier_financials_pipeline.id}
+        - task_key: compute_ratios
+          depends_on:
+            - task_key: refresh_silver
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ./sql/ratio_engine.sql
+      schedule:
+        quartz_cron_expression: "0 0 2 * * ?"   # daily 02:00
+        timezone_id: Australia/Melbourne
+        pause_status: PAUSED
+
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production
